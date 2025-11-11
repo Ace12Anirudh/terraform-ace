@@ -5,3 +5,11 @@ sudo service httpd start
 sudo systemctl enable httpd
 echo "<h1>AWS Infra created using Terraform in us-east-1 Region</h1>" > /var/www/html/index.html
 yum install git -y
+
+
+
+
+
+
+
+
