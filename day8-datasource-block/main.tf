@@ -43,3 +43,5 @@ resource "aws_db_instance" "default" {
   skip_final_snapshot = true
  #depends_on = [ aws_db_subnet_group.sub-grp.id ]
 }
+
+# In the above block of code, we are using a vpc and a subnet that is already created on AWS using its console. Then using data block, which refers to data sources, that is, a vpc and a subnet. By doing this, we are retrieving the information about the vpc and subnet that are created outside of terraform configuration or from the terraform configuration.
