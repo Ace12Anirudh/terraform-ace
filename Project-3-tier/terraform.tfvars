@@ -6,4 +6,4 @@
 # backend_git_repo  = "https://github.com/CloudTechDevOps/2nd10WeeksofCloudOps-main"
 # frontend_ami = "ami-xxxxxxxx"
 # backend_ami  = "ami-yyyyyyyy"
-my_ip = "223.178.11.176/32"
+my_ip = "0.0.0.0/0"
