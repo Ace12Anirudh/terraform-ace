@@ -1,0 +1,13 @@
+resource "aws_instance" "web" {
+  ami           = var.ami_id
+  instance_type = var.instance_type
+  subnet_id     = var.subnet_1_id
+
+  tags = {
+    Name = "WebServer"
+  }
+}
+
+output "instance_id" {
+  value = aws_instance.web.id
+}
