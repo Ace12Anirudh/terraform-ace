@@ -1,57 +1,73 @@
 #!/bin/bash
-# --- User Data for Frontend Server on Amazon Linux 2 ---
-# This script configures the frontend instance for the 3-tier application.
+# --- Frontend User Data Script for Amazon Linux 2 ---
 
-# --- !! IMPORTANT !! ---
-# This placeholder will be replaced by Terraform with the actual DNS name of your Backend Load Balancer.
-# NEW, CORRECT WAY
-export BACKEND_ALB_DNS="http://${backend_alb_dns}"
-# ------------------------
+# Terraform variable (Backend ALB DNS)
+BACKEND_ALB_DNS="${backend_alb_dns}"
 
-# --- Step 1: Install All Dependencies ---
-# Update all installed packages
+# ------------------------------
+# Step 1: Install Dependencies
+# ------------------------------
+
 yum update -y
-
-# Install Apache web server (httpd), Git, and other necessary tools
 yum install -y httpd git
 
-# Install Node.js v18.x
-# The nodesource script adds the required repository for a specific Node.js version.
+# Install Node.js 18
 curl -fsSL https://rpm.nodesource.com/setup_18.x | bash -
 yum install -y nodejs
 
-echo "All frontend dependencies installed successfully."
+echo "Dependencies installed."
 
-# --- Step 2: Configure and Start Apache ---
+# ------------------------------
+# Step 2: Start Apache
+# ------------------------------
+
 systemctl start httpd
-systemctl enable httpd # Ensure Apache starts on reboot
+systemctl enable httpd
 
-# --- Step 3: Clone and Configure Application ---
-# We will work in the ec2-user's home directory for clarity and permissions
-cd /root
+# ------------------------------
+# Step 3: Clone Frontend Code
+# ------------------------------
 
-# Clone the application repository
+# Work inside ec2-user home
+cd /home/ec2-user
+
+
+# Clone the repo
 git clone https://github.com/CloudTechDevOps/2nd10WeeksofCloudOps-main.git
 
-# Navigate to the client (frontend) directory
-cd 2nd10WeeksofCloudOps-main/client
+# Fix permissions
+chown -R ec2-user:ec2-user /home/ec2-user/2nd10WeeksofCloudOps-main
 
-# Dynamically update the config.js file with the backend load balancer's DNS name.
-echo "Updating API endpoint to ${backend_alb_dns}"
-sed -i "s|${backend_alb_dns}|g" src/config.js
+echo "Repository cloned."
 
-# --- Step 4: Build and Deploy Frontend Application ---
-# Install project-specific Node.js packages from package.json
-npm install
+# ------------------------------
+# Step 4: Update config.js and Build React App
+# ------------------------------
 
-# Build the React application for production.
-npm run build
+sudo -u ec2-user -H bash -c "
+cd /home/ec2-user/2nd10WeeksofCloudOps-main/client && \
+echo 'Updating API endpoint to: http://$BACKEND_ALB_DNS' && \
+sed -i \"s|http://.*|http://$BACKEND_ALB_DNS\" src/config.js
+"
 
-# Copy the built static files to the Apache web root directory.
-cp -r build/* /var/www/html/
+# Install Node modules
+sudo -u ec2-user -H bash -c "
+cd /home/ec2-user/2nd10WeeksofCloudOps-main/client && npm install
+"
 
-# Ensure Apache has the correct ownership of the web files.
-# On Amazon Linux, the Apache user and group are both 'apache'.
+# Build React
+sudo -u ec2-user -H bash -c "
+cd /home/ec2-user/2nd10WeeksofCloudOps-main/client && npm run build
+"
+
+echo "Frontend build completed."
+
+# ------------------------------
+# Step 5: Deploy to Apache
+# ------------------------------
+
+rm -rf /var/www/html/*
+cp -r /home/ec2-user/2nd10WeeksofCloudOps-main/client/build/* /var/www/html/
 chown -R apache:apache /var/www/html
 
-echo "Frontend setup completed successfully. Application is deployed."
+echo "Frontend deployed successfully."

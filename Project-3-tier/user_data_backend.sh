@@ -1,76 +1,79 @@
 #!/bin/bash
-# --- User Data for Backend Server on Amazon Linux 2 ---
-# This script configures the backend instance for the 3-tier application.
+# --- Backend User Data Script for Amazon Linux 2 ---
 
-# --- !! IMPORTANT !! ---
-# These placeholders will be replaced by Terraform with your actual RDS database details.
-# NEW, CORRECT WAY
-export DB_HOST="${db_host}"
-export DB_USER="${db_user}"
-export DB_PASSWORD="${db_password}"
-# ------------------------
+# Terraform variables
+DB_HOST="${db_host}"
+DB_USER="${db_user}"
+DB_PASSWORD="${db_password}"
 
-# --- Step 1: Install All Dependencies ---
-# Update all installed packages
+# ------------------------------
+# Step 1: Install Dependencies
+# ------------------------------
+
 yum update -y
-
-# Install Git, MySQL client (to connect to RDS), and build tools.
-# 'mysql' package provides the client tools needed to connect to RDS.
 yum install -y git mysql
 
-# Install Node.js v18.x
+# Install Node.js 18
 curl -fsSL https://rpm.nodesource.com/setup_18.x | bash -
 yum install -y nodejs
 
-# Install PM2, a production process manager for Node.js applications, globally.
+# Install PM2 globally
 npm install -g pm2
 
-echo "All backend dependencies installed successfully."
+echo "Dependencies installed."
 
-# --- Step 2: Clone and Configure Application ---
-# Work in the ec2-user's home directory
-cd /root
+# ------------------------------
+# Step 2: Clone Application Code
+# ------------------------------
 
-# Clone the application repository
+# Switch to ec2-user home
+cd /home/ec2-user
+
+# Clone the repository
 git clone https://github.com/CloudTechDevOps/2nd10WeeksofCloudOps-main.git
 
-# Navigate to the backend directory
-cd 2nd10WeeksofCloudOps-main/backend
+# Set correct permissions so ec2-user owns the files
+chown -R ec2-user:ec2-user /home/ec2-user/2nd10WeeksofCloudOps-main
 
-# Create the .env file non-interactively with the database credentials from Terraform
-echo "Creating .env file with database credentials..."
+echo "Repository cloned."
+
+# ------------------------------
+# Step 3: Backend Setup
+# ------------------------------
+
+sudo -u ec2-user -H bash -c "cd /home/ec2-user/2nd10WeeksofCloudOps-main/backend && \
 cat <<EOF > .env
-DB_HOST=${db_host}
-DB_USERNAME=${db_user}
-DB_PASSWORD=${db_password}
+DB_HOST=$DB_HOST
+DB_USERNAME=$DB_USER
+DB_PASSWORD=$DB_PASSWORD
 PORT=3306
-EOF
+EOF"
 
-# --- Step 3: Install Packages and Initialize Database ---
-# Install project-specific Node.js packages
-npm install
-npm install dotenv
+echo ".env file created."
 
-# Wait for 30 seconds to give the RDS database time to become fully available
-echo "Waiting 30 seconds for RDS to be ready..."
+# Install Node packages as ec2-user
+sudo -u ec2-user -H bash -c "cd /home/ec2-user/2nd10WeeksofCloudOps-main/backend && npm install && npm install dotenv"
+
+# Wait for RDS to be ready
 sleep 30
 
-# Set the MySQL password as an environment variable to avoid interactive prompts
-export MYSQL_PASSWORD=${db_password}
+# Initialize DB
+sudo -u ec2-user -H bash -c "cd /home/ec2-user/2nd10WeeksofCloudOps-main/backend && mysql -h $DB_HOST -u $DB_USER < test.sql"
 
-# Initialize the database schema by running the test.sql script against the RDS instance
-echo "Initializing database schema on ${db_host}..."
-mysql -h "${db_host}" -u "${db_user}" < test.sql
+echo "Database initialized."
 
-# --- Step 4: Start Application with PM2 ---
-# Start the Node.js application using PM2, giving it a friendly name
-pm2 start index.js --name "backendApi"
+# ------------------------------
+# Step 4: Start Backend with PM2
+# ------------------------------
 
-# Configure PM2 to automatically restart on system reboot for the 'ec2-user'.
-# The user and home path are critical for this command to work correctly.
-# pm2 startup systemd -u ec2-user --hp /home/ec2-user
+sudo -u ec2-user -H bash -c "cd /home/ec2-user/2nd10WeeksofCloudOps-main/backend && pm2 start index.js --name backendApi"
 
-# Save the current list of running processes so PM2 can resurrect them on reboot
-pm2 save
+sudo -u ec2-user -H bash -c "pm2 save"
+sudo pm2 startup systemd -u ec2-user --hp /home/ec2-user
 
-echo "Backend setup completed successfully. API is running via PM2."
+echo "Backend app started with PM2."
+
+# ------------------------------
+# Completed
+# ------------------------------
+echo "Backend setup completed successfully."
